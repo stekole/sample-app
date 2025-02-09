@@ -1,0 +1,138 @@
+### I put two examples in here. 
+### 1. Kube-Prometheus-stack: https://github.com/prometheus-community/helm-charts/blob/main/charts/kube-prometheus-stack/values.yaml
+### 2. A standalone Prometheus
+### uncomment/comment out the block you wish to use, or delete it..
+
+### 1. Using the Kube-Prometheus-stack operator
+### I prefer this method as it scales well and you can easily manage resources
+### from within the chart
+### Kube-Prometheus-stack: 
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prometheus
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+  source:
+    chart: kube-prometheus-stack
+    repoURL: https://prometheus-community.github.io/helm-charts
+    targetRevision: ~67.0
+    helm:
+      releaseName: kube-prometheus-stack
+      skipCrds: false
+      valuesObject:
+        global:
+          rbac:
+            create: true
+            createAggregateClusterRoles: false
+        prometheus:
+          prometheusSpec:
+            ruleSelectorNilUsesHelmValues: false
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            probeSelectorNilUsesHelmValues: false
+            scrapeConfigSelectorNilUsesHelmValues: false
+        grafana:
+          enabled: false # use the operator instead
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+
+### 2. Single Instance Prometheus
+# ---
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: prometheus
+#   namespace: argocd
+# spec:
+#   project: default
+#   source:
+#     repoURL: https://prometheus-community.github.io/helm-charts
+#     targetRevision: 27.1.0
+#     chart: prometheus
+#     helm:
+#       values: |
+#         server:
+#           persistentVolume:
+#             enabled: true
+#             size: 50Gi
+#           retention: 15d
+#         alertmanager:
+#           persistentVolume:
+#             enabled: true
+#             size: 10Gi
+#         pushgateway:
+#           enabled: true
+#         nodeExporter:
+#           enabled: true
+#         rules:
+#           - record: http_request_duration_quantiles
+#             expr: |
+#               histogram_quantile(0.99, rate(http_request_duration_seconds_bucket{endpoint="/hello"}[5m]))
+#               histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{endpoint="/hello"}[5m]))
+#               histogram_quantile(0.90, rate(http_request_duration_seconds_bucket{endpoint="/hello"}[5m]))
+#               histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{endpoint="/hello"}[5m]))
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: monitoring
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#     - CreateNamespace=true
+#---
+# apiVersion: v1
+# kind: ServiceAccount
+# metadata:
+#   name: prometheus
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRole
+# metadata:
+#   name: prometheus
+# rules:
+# - apiGroups: [""]
+#   resources:
+#   - nodes
+#   - nodes/metrics
+#   - services
+#   - endpoints
+#   - pods
+#   verbs: ["get", "list", "watch"]
+# - apiGroups: [""]
+#   resources:
+#   - configmaps
+#   verbs: ["get"]
+# - apiGroups:
+#   - networking.k8s.io
+#   resources:
+#   - ingresses
+#   verbs: ["get", "list", "watch"]
+# - nonResourceURLs: ["/metrics"]
+#   verbs: ["get"]
+# ---
+# apiVersion: rbac.authorization.k8s.io/v1
+# kind: ClusterRoleBinding
+# metadata:
+#   name: prometheus
+# roleRef:
+#   apiGroup: rbac.authorization.k8s.io
+#   kind: ClusterRole
+#   name: prometheus
+# subjects:
+# - kind: ServiceAccount
+#   name: prometheus
+#   namespace: default

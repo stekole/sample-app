@@ -1,0 +1,64 @@
+
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: Grafana
+metadata:
+  name: grafana
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    dashboards: "grafana" # Notice the label matches the datasource selector
+spec:
+  config:
+    security:
+      admin_user: admin
+      admin_password: admin
+  deployment:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: grafana
+              securityContext:
+                runAsUser: 1001
+                runAsGroup: 1001
+                runAsNonRoot: true
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+              readinessProbe:
+                failureThreshold: 3
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDatasource
+metadata:
+  name: example-grafanadatasource
+  labels:
+    dashboards: "grafana" # Notice the label
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  allowCrossNamespaceImport: true
+  datasource:
+    # access: proxy
+    database: prometheus
+    type: prometheus
+    access: proxy
+    jsonData:
+      timeInterval: 5s
+      tlsSkipVerify: true
+    name: Prometheus
+    url: http://prometheus-operated.monitoring:9090
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: example-alertmanager
+  namespace: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  replicas: 1

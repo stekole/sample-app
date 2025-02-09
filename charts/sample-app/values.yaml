@@ -1,0 +1,63 @@
+---
+# This is a YAML-formatted file.
+# Declare default values to be passed into your helm chart.
+image:
+  repository: docker.io/library/sample-app
+  tag: latest
+  pullPolicy: IfNotPresent #Set IfNotPresent or Never to enforce Kubernetes give priority to the local image or never look into public repositories.
+
+ingress:
+  enabled: true
+  host: example.com  # Required host value
+  annotations: {}
+
+deployments:
+  backend:
+    image:
+      repository: docker.io/library/sample-app
+      tag: latest
+      pullPolicy: IfNotPresent
+    appPort: 8080
+    metricsEnabled: true
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      cpu:
+        targetType: Utilization
+        value: 80
+      memory:
+        targetType: Utilization
+        value: 80
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 100m
+        memory: 128Mi
+    # canary:
+    #   enabled: false
+    #   steps:
+    #   - setWeight: 20
+    #   - pause: {duration: 1m}
+    #   - setWeight: 40
+    #   - pause: {duration: 3m}
+    #   - setWeight: 60
+    #   - pause: {duration: 5m}
+    #   - setWeight: 80
+    #   - pause: {duration: 5m}
+    #   analysis:
+    #     template: success-rate
+  # etc..
+
+kafka:
+  enabled: false
+redis:
+  enabled: false
+postgresql:
+  enabled: false
+dashboard:
+  enabled: true
+alerting:
+  enabled: false

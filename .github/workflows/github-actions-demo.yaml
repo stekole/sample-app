@@ -1,0 +1,139 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+#   test:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - uses: actions/setup-go@v4
+#         with:
+#           go-version: '1.23'
+#           cache: false
+#       - name: Get dependencies
+#         run: go get -v -t -d ./...
+#       - name: Verify Formatting
+#         run: '[[ -z $(gofmt -l .) ]]'
+#       - name: Unit Tests
+#         run: go test -v ./...
+#       - name: Build
+#         run: go build -v ./...
+
+#   kubernetes:
+#     needs: test
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v3
+#       - name: Install kubeconform
+#         run: |
+#           curl -L -o kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.6.4/kubeconform-linux-amd64.tar.gz
+#           tar xzf kubeconform.tar.gz
+#           sudo mv kubeconform /usr/local/bin/
+#           rm kubeconform.tar.gz
+#       - name: Render helm chart
+#         run: |
+#           helm dependency build ./charts/sample-app/
+#           helm dependency update ./charts/sample-app/
+#           helm template ./charts/sample-app -f ./charts/sample-app/test_values.yaml > rendered-helm-chart.yaml
+#           helm lint ./charts/sample-app/
+#           kubeconform -schema-location default -schema-location 'https://raw.githubusercontent.com/argoproj/argo-rollouts/master/api/v1alpha1/openapi-spec/swagger.json' -summary rendered-helm-chart.yaml
+#           cat rendered-helm-chart.yaml
+
+
+  # build:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Build Docker image
+  #       run: docker build . -t sample-app
+  #     - name: Run container
+  #       run: docker run -d -p 8080:8080 sample-app
+
+# maybe this can be a minikube integration test? or what is the best option to not hinder performance
+  # integration:
+  #   needs: test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Build Docker image
+  #       run: docker build . -t sample-app
+  #     - name: Build and run app container
+  #       run: |
+  #         docker run -d -p 8080:8080 sample-app
+  #     - name: Install k6
+  #       run: |
+  #         curl https://github.com/grafana/k6/releases/download/v0.44.0/k6-v0.44.0-linux-amd64.tar.gz -L | tar xvz
+  #         sudo cp k6-v0.44.0-linux-amd64/k6 /usr/local/bin
+  #     - name: Run k6 Tests
+  #       run: k6 run --vus 10 ./test/k6.js
+
+  minikube:
+    # needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Start Minikube
+        run: |
+          # this is a script that starts minikube and installs argocd
+          ./run.sh --cicd 
+      # - name: Build and load image into the registry
+      #   run: |
+      #     # docker build . -t sample-app # moved to run.sh
+      #     # minikube image load microblog # moved to run.sh
+      - name: Setup TLS
+        run: |
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=microblog.dev"
+          kubectl create secret tls tls-secret --namespace=ingress-nginx --cert=tls.crt --key=tls.key -n ingress-nginx
+      - name: Configure ingress with expect # why expect? :https://github.com/kubernetes/minikube/issues/8283
+        run: |
+          expect -c '
+          spawn minikube addons configure ingress
+          expect "Please enter the default SSL certificate (format: namespace/secretname):"
+          send "ingress-nginx/tls-secret\r"
+          expect eof
+          '
+          minikube addons disable ingress 
+          minikube addons enable ingress
+      # - name: Configure NGINX (optional)
+      #   run: |
+      #     kubectl apply -f - <<EOF
+      #     apiVersion: v1
+      #     kind: ConfigMap
+      #     metadata:
+      #       name: nginx-configuration
+      #       namespace: ingress-nginx
+      #     data:
+      #       max-worker-connections: "65536"
+      #       worker-processes: "auto"
+      #     EOF
+      # - name: Deploy Helm Manually (Optional)
+      #   run: |
+      #     helm repo add bitnami https://charts.bitnami.com/bitnami
+      #     helm repo update
+      #     helm dependency update charts
+      #     kubectl wait --namespace ingress-nginx \
+      #       --for=condition=ready pod \
+      #       --selector=app.kubernetes.io/component=controller \
+      #       --timeout=120s
+      #     helm upgrade -i sample-app charts/ --namespace=microblog --create-namespace --wait
+      #     kubectl get pods -n microblog
+      #     kubectl get ingress -n microblog
+      - name: End-to-End Test
+        run: |
+          echo "$(minikube ip) example.com" | sudo tee -a /etc/hosts
+          # echo "127.0.0.1 example.com" | sudo tee -a /etc/hosts
+          sudo minikube tunnel > tunnel.log 2>&1 &
+          kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+          sleep 30
+          NODEPORT=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}' )
+          kubectl get ingress -n sample-app -o yaml
+          kubectl get ingress -A
+          curl -v -k https://example.com:${NODEPORT}/hello
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
+          k6 run --vus 10 ./test/k6.js

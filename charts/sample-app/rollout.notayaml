@@ -1,0 +1,56 @@
+---
+# {{- range $name, $deployment := .Values.deployments }}
+# {{- if $deployment.canary.enabled }}
+# ---
+# apiVersion: argoproj.io/v1alpha1
+# kind: Rollout
+# metadata:
+#   name: {{ $name }}
+#   labels:
+#     app: {{ $name }}
+# spec:
+#   replicas: {{ $deployment.replicas | default 1 }}
+#   selector:
+#     matchLabels:
+#       app: {{ $name }}
+#   template:
+#     metadata:
+#       labels:
+#         app: {{ $name }}
+#     spec:
+#       containers:
+#       - name: {{ $name }}
+#         image: {{ $deployment.image.repository }}:{{ $deployment.image.tag }}
+#         ports:
+#         - containerPort: {{ $deployment.appPort | default "8080" }}
+#   strategy:
+#     canary:
+#       steps:
+#       {{- toYaml $deployment.canary.steps | nindent 6 }}
+#       analysis:
+#         templates:
+#         - templateName: {{ $deployment.canary.analysis.template }}
+# {{- end }}
+# {{- end }}
+# {{- range $name, $deployment := .Values.deployments }}
+# {{- if $deployment.canary.enabled }}
+# ---
+# apiVersion: argoproj.io/v1alpha1
+# kind: AnalysisTemplate
+# metadata:
+#   name: {{ $deployment.canary.analysis.template }}
+# spec:
+#   metrics:
+#   {{- range $metric := $deployment.canary.analysis.metrics }}
+#   - name: {{ $metric.name }}
+#     provider:
+#       prometheus:
+#         address: {{ $metric.address }}
+#         query: {{ $metric.query }}
+#     successCondition: {{ $metric.successCondition }}
+#     failureLimit: {{ $metric.failureLimit | default 3 }}
+#     interval: {{ $metric.interval | default "30s" }}
+#     count: {{ $metric.count | default 10 }}
+#   {{- end }}
+# {{- end }}
+# {{- end }}

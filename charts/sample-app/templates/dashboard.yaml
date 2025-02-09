@@ -1,0 +1,40 @@
+{{- if .Values.dashboard.enabled }}
+---
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: {{ $.Release.Namespace }}-application-metrics
+spec:
+  resyncPeriod: 30s
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  json: |
+    {
+      "id": null,
+      "title": "Simple Dashboard",
+      "panels": [
+        {
+          "title": "Error Rate",
+          "type": "graph",
+          "targets": [{
+            "expr": "sum(rate(http_requests_total{status=~\"5.*\"}[5m])) / sum(rate(http_requests_total[5m]))"
+          }]
+        },
+        {
+          "title": "Request Latency",
+          "type": "graph",
+          "targets": [{
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))"
+          }]
+        },
+        {
+          "title": "Request Volume",
+          "type": "graph",
+          "targets": [{
+            "expr": "sum(rate(http_requests_total[5m]))"
+          }]
+        }
+      ]
+    }
+{{- end }}

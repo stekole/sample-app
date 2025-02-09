@@ -1,0 +1,6 @@
+rendered-helm-chart.yaml
+Chart.lock
+charts/charts/
+charts/sample-app/charts/
+secrets.yaml
+.vscode/*

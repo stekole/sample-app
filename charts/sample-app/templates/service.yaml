@@ -1,0 +1,43 @@
+{{- range $name, $deployment := .Values.deployments }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+  {{- if or $deployment.annotations $deployment.metricsEnabled }}
+  annotations:
+    {{- if $deployment.metricsEnabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ $deployment.metricsPort | default "8080" | quote }}
+    prometheus.io/path: {{ $deployment.metricsPath | default "/metrics" }}
+    {{- end }}
+    {{- with $deployment.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    app: {{ $name }}
+  type: {{ $deployment.serviceType | default "ClusterIP" }}
+  ports:
+  - name: {{ $deployment.appPortName | default "http" }}
+    protocol: {{$deployment.protocol | default "TCP" }}
+    port: {{ $deployment.appPort | default "8080" }}
+    targetPort: {{ $deployment.appPort | default "8080" }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}
+  labels:
+    app: kube-prometheus-stack-prometheus
+spec:
+  endpoints:
+  - interval: 30s
+    port: {{ $deployment.appPortName | default "http" }}
+  selector:
+    matchLabels:
+      app: {{ $name }}
+{{- end }}

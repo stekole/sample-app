@@ -1,0 +1,11 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-configuration
+  namespace: ingress-nginx
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+data:
+  max-worker-connections: "65536"
+  worker-processes: "auto"

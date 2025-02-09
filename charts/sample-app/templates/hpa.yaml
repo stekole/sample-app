@@ -1,0 +1,33 @@
+{{- range $name, $deployment := .Values.deployments }}
+{{- if $deployment.hpa.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $name }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $name }}
+  minReplicas: {{ $deployment.hpa.minReplicas | default 1 }}
+  maxReplicas: {{ $deployment.hpa.maxReplicas | default 3 }}
+  metrics:
+  {{- if $deployment.hpa.cpu.targetType }}
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ $deployment.hpa.cpu.value | default 80 }}
+  {{- end }}
+  {{- if $deployment.hpa.memory.targetType }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ $deployment.hpa.memory.value | default 70 }}
+  {{- end }}
+{{- end }}
+{{- end }}

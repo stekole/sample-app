@@ -1,0 +1,74 @@
+{{- range $name, $deployment := .Values.deployments }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels:
+    app: {{ $name }}
+  {{- if or $deployment.annotations $deployment.metricsEnabled }}
+  annotations:
+    {{- if $deployment.metricsEnabled }}
+    prometheus.io/scrape: "true"
+    prometheus.io/port: {{ $deployment.metricsPort | default "8080" | quote }}
+    prometheus.io/path: {{ $deployment.metricsPath | default "/metrics" }}
+    {{- end }}
+    {{- with $deployment.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $name }}
+      {{- if or $deployment.annotations $deployment.metricsEnabled }}
+      annotations:
+        {{- if $deployment.metricsEnabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ $deployment.metricsPort | default "8080" | quote }}
+        prometheus.io/path: {{ $deployment.metricsPath | default "/metrics" }}
+        {{- end }}
+        {{- with $deployment.annotations }}
+        {{- toYaml . | nindent 4 }}
+        {{- end }}
+      {{- end }}
+    spec:
+      containers:
+      - name: {{ $name }}
+        image: {{ $deployment.image.repository }}:{{ $deployment.image.tag }}
+        imagePullPolicy: {{ $deployment.image.pullPolicy }}
+        ports:
+        - name: {{ $deployment.appPortName | default "http" }}
+          containerPort: {{ $deployment.appPort | default "8080" }}
+        resources:
+{{- if $deployment.resources }}
+{{ toYaml $deployment.resources | indent 10 }}
+{{- else }}
+          limits: 
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+{{- end }}
+{{- if $deployment.livenessProbe }}
+        livenessProbe:
+{{- toYaml $deployment.livenessProbe | indent 10 }}
+{{- end }}
+{{- if $deployment.readinessProbe }}
+        readinessProbe:
+{{- toYaml $deployment.readinessProbe | indent 10 }}
+{{- end }}
+{{- if $deployment.startupProbe }}
+        startupProbe:
+{{- toYaml $deployment.startupProbe | indent 10 }}
+{{- end }}
+{{- if $deployment.env }}
+        env:
+{{- toYaml $deployment.env | indent 10 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,27 @@
+---
+{{- if .Values.ingress }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+spec:
+  tls:
+  - hosts:
+    - {{ $.Values.ingress.host }}
+    {{- if $.Values.ingress.secretName }}
+    secretName: {{ $.Values.ingress.secretName }}
+    {{- end }}
+  rules:
+  - host: {{  $.Values.ingress.host | required "ingress.host is required"}}
+    http:
+      paths:
+      {{- range $name, $deployment := .Values.deployments }}
+      - path: {{ $deployment.path | default "/" }}
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ $name }}
+            port:
+              number: {{ $deployment.appPort | default 8080 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,70 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    #repoURL: oci://ghcr.io/grafana/helm-charts/grafana-operator
+    targetRevision: 5.16.0
+    chart: grafana-operator
+    helm:
+      skipCrds: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+# ---
+# apiVersion: argoproj.io/v1alpha1
+# kind: Application
+# metadata:
+#   name: grafana
+#   namespace: argocd
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "-100"
+# spec:
+#   project: default
+#   source:
+#     repoURL: https://grafana.github.io/helm-charts
+#     targetRevision: 8.8.5
+#     chart: grafana
+#     helm:
+#       skipCrds: false
+#       values: |
+#         persistence:
+#           enabled: true
+#           size: 10Gi
+#         service:
+#           type: ClusterIP
+#         ingress:
+#           enabled: false
+#         adminPassword: admin
+#         datasources:
+#           datasources.yaml:
+#             apiVersion: 1
+#             datasources:
+#               - name: Prometheus
+#                 type: prometheus
+#                 access: proxy
+#                 url: http://prometheus-operated:9090
+#                 isDefault: true
+#   destination:
+#     server: https://kubernetes.default.svc
+#     namespace: monitoring
+#   syncPolicy:
+#     automated:
+#       prune: true
+#       selfHeal: true
+#     syncOptions:
+#     - CreateNamespace=true
