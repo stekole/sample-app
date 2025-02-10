@@ -88,7 +88,7 @@ jobs:
       #     # minikube image load microblog # moved to run.sh
       - name: Setup TLS
         run: |
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=microblog.dev"
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=example.com"
           kubectl create secret tls tls-secret --namespace=ingress-nginx --cert=tls.crt --key=tls.key -n ingress-nginx
       - name: Configure ingress with expect # why expect? :https://github.com/kubernetes/minikube/issues/8283
         run: |
@@ -136,4 +136,6 @@ jobs:
           kubectl get ingress -A
           curl -v -k https://example.com:${NODEPORT}/hello
           kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller
+          curl https://github.com/grafana/k6/releases/download/v0.56.0/k6-v0.56.0-linux-amd64.tar.gz -L | tar xvz
+          sudo cp k6-v0.56.0-linux-amd64/k6 /usr/local/bin
           k6 run --vus 10 ./test/k6.js

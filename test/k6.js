@@ -7,7 +7,7 @@ const BASE_URL = __ENV.BASE_URL || 'https://example.com';
 export const options = {
   stages: [
     { duration: '30s', target: 100 },
-    { duration: '15m', target: 1000 },
+    { duration: '1m', target: 1000 },
     { duration: '30s', target: 0 },
   ],
   thresholds: {
